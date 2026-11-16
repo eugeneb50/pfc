@@ -1,0 +1,17 @@
+[package]
+name = "pfc"
+version = "0.1.0"
+edition = "2024"
+description = "Phonetic frequency compression: lossless phrase-pair glyph substitution, scored in on-disk bytes"
+license = "MIT"
+repository = "https://github.com/eugeneb50/pfc"
+readme = "README.md"
+
+[dependencies]
+aho-corasick = "1"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
