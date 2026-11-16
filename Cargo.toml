@@ -1,8 +1,8 @@
 [package]
 name = "pfc"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition = "2024"
-description = "Phonetic frequency compression: lossless phrase-pair glyph substitution, scored in on-disk bytes"
+description = "Non-colliding PII pseudonymization suite for LLM privacy"
 license = "MIT"
 repository = "https://github.com/eugeneb50/pfc"
 readme = "README.md"
@@ -11,7 +11,20 @@ readme = "README.md"
 aho-corasick = "1"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+toml = "1.2.1"
+toml_edit = "0.25.19"
+unicode-normalization = "0.1.26"
 
 [profile.release]
 lto = true
 codegen-units = 1
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+# Optimize dependencies (regex, aho-corasick) even in debug builds; keeps tests fast.
+[profile.dev.package."*"]
+opt-level = 2

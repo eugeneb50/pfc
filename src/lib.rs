@@ -10,6 +10,8 @@
 pub mod codec;
 pub mod codes;
 pub mod format;
+pub mod key;
+pub mod llm;
 pub mod mine;
 
 pub use codec::Codebook;

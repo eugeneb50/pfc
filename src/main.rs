@@ -5,10 +5,17 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-/// Phonetic frequency compression: lossless phrase-pair glyph substitution.
+mod llm_cli;
+use llm_cli::{FuzzyArg, KeyCmd, KindArg, LegendFormat};
+
+/// Non-colliding PII pseudonymization for LLM privacy, plus lossless
+/// phrase-substitution compression.
 ///
-/// Files and `-` (stdin/stdout) are both accepted. Without -o, `compress x`
-/// writes `x.pfc` and `decompress x.pfc` writes `x` (stdin goes to stdout).
+/// LLM mode: build a local key (`pfc key`), `encode` text before it goes to a
+/// model, `decode` the reply. This is pseudonymization, not encryption.
+///
+/// Compression mode: `compress x` writes `x.pfc`, `decompress x.pfc` writes `x`.
+/// Files and `-` (stdin/stdout) are both accepted.
 #[derive(Parser)]
 #[command(version)]
 struct Cli {
@@ -34,6 +41,71 @@ impl Tuning {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// Manage an LLM-mode key: the local TOML file mapping terms to codes.
+    Key {
+        #[command(subcommand)]
+        cmd: KeyCmd,
+    },
+    /// Replace key terms with codes before text goes to a model; runs `check` on the result.
+    Encode {
+        input: Option<PathBuf>,
+        #[arg(short, long)]
+        key: PathBuf,
+        /// Output even if the check finds unencoded private text.
+        #[arg(long)]
+        no_check: bool,
+        /// Warnings block output too.
+        #[arg(long)]
+        strict: bool,
+        /// Print matched text in findings even when stderr is not a terminal.
+        #[arg(long)]
+        show: bool,
+    },
+    /// Report private terms, near misses and diacritic variants in text; exit 0 only if clean.
+    Check {
+        input: Option<PathBuf>,
+        #[arg(short, long)]
+        key: PathBuf,
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        strict: bool,
+        /// Include matched text even when stdout is not a terminal.
+        #[arg(long)]
+        show: bool,
+    },
+    /// Decode a model reply, repairing mangled codes where safe. Exit 3 if anything needs review.
+    Decode {
+        input: Option<PathBuf>,
+        #[arg(short, long)]
+        key: PathBuf,
+        #[arg(long, value_enum, default_value = "auto")]
+        fuzzy: FuzzyArg,
+        /// Write the JSON report here.
+        #[arg(long)]
+        report: Option<PathBuf>,
+        /// Wrap unresolved items as ⟪?…⟫ in the output.
+        #[arg(long)]
+        mark: bool,
+        /// Safe repairs also fail the exit status.
+        #[arg(long)]
+        strict: bool,
+        /// Show leaked terms in the report.
+        #[arg(long)]
+        show: bool,
+        /// The encoded text that was sent (bare codes found in it are not repaired).
+        #[arg(long)]
+        sent: Option<PathBuf>,
+    },
+    /// Print the instructions (private) or code table (abbrev) to give the model.
+    Legend {
+        #[arg(short, long)]
+        key: PathBuf,
+        #[arg(long, value_enum)]
+        kind: Option<KindArg>,
+        #[arg(long, value_enum, default_value = "text")]
+        format: LegendFormat,
+    },
     /// Compress a file.
     #[command(visible_alias = "c")]
     Compress {
@@ -100,7 +172,7 @@ fn read_input(p: &Option<PathBuf>) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
-fn read_text(p: &Option<PathBuf>) -> Result<String> {
+pub(crate) fn read_text(p: &Option<PathBuf>) -> Result<String> {
     String::from_utf8(read_input(p)?).context("input is not UTF-8 text")
 }
 
@@ -139,6 +211,13 @@ fn report(name: &str, original: usize, packed: usize, secs: f64) {
 fn main() -> Result<()> {
     let space = Cherokee::default();
     match Cli::parse().cmd {
+        Cmd::Key { cmd } => llm_cli::key_cmd(cmd),
+        Cmd::Encode { input, key, no_check, strict, show } => llm_cli::encode(input, key, no_check, strict, show),
+        Cmd::Check { input, key, json, strict, show } => llm_cli::check(input, key, json, strict, show),
+        Cmd::Decode { input, key, fuzzy, report, mark, strict, show, sent } => {
+            llm_cli::decode(input, key, fuzzy, report, mark, strict, show, sent)
+        }
+        Cmd::Legend { key, kind, format } => llm_cli::legend(key, kind, format),
         Cmd::Compress { input, output, key, force, tuning } => {
             let t0 = Instant::now();
             let text = read_text(&input)?;

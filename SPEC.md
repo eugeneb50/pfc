@@ -1,7 +1,19 @@
 # pfc LLM mode — specification
 
-Status: draft, 2026-11-16. Nothing in this document is implemented yet; the
-compression mode (`pfc c / d / train / stats`) described in README.md is.
+Status: draft, 2026-11-16. **Phases 1 and 2 are implemented** (key file and
+`pfc key`, `encode`, `check`, `decode` with R0–R9, `legend`); phases 0 and 3–5
+are not. Where the implementation settled something this draft left open:
+
+- Glyph pools are generated once by `tools/genpool.py` from Unicode 18.0.0
+  `confusables.txt` and committed as `src/llm/pools.rs` (pinned for format 1),
+  rather than generated at build time. Pools: 96 Cherokee, 89 Katakana glyphs.
+- LLM styles use their own `GlyphSpace`/`CodeId` types in `src/llm/style.rs`;
+  the compression `CodeSpace` trait is unchanged.
+- R4 covers a suffix written *inside* the brackets (`⟦ORG1·3's⟧`); a suffix
+  outside is the instructed form and decodes as R0.
+- R3 consults the sent text only when `pfc decode --sent FILE` is given.
+- Not yet: `check`'s `candidate` findings (need `pfc scan`), token counts in
+  `legend` and the abbrev token-savings warning (need the o200k tokenizer).
 
 ## 1. Purpose
 

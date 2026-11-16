@@ -1,1 +1,5 @@
 target/
+
+# pfc key files hold secrets; never commit them
+*.key.toml
+.*.edit.toml
